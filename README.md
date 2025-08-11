@@ -178,6 +178,11 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 For support or questions, please open an issue in the GitHub repository.
 
+## 👥 Team Information
+
+- **Team Leader**: Zenith Shah - zenithshah1912@gmail.com
+- **Team Member**: Mitali Prajapati - prajapatimitali570@gmail.com
+
 ---
 
 **Built with ❤️ for sports enthusiasts and venue owners**
