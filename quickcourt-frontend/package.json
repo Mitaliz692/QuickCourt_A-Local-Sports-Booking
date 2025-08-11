@@ -1,0 +1,61 @@
+{
+  "name": "quickcourt-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@emotion/react": "*",
+    "@emotion/styled": "*",
+    "@mui/icons-material": "*",
+    "@mui/material": "*",
+    "@mui/x-date-pickers": "*",
+    "@reduxjs/toolkit": "*",
+    "@testing-library/jest-dom": "*",
+    "@testing-library/react": "*",
+    "@testing-library/user-event": "*",
+    "@types/jest": "*",
+    "@types/node": "*",
+    "@types/react": "*",
+    "@types/react-dom": "*",
+    "axios": "^1.11.0",
+    "bcryptjs": "^3.0.2",
+    "dotenv": "^17.2.1",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.17.1",
+    "react": "*",
+    "react-dom": "*",
+    "react-hook-form": "*",
+    "react-redux": "*",
+    "react-router-dom": "^7.8.0",
+    "react-scripts": "*",
+    "typescript": "*",
+    "web-vitals": "*",
+    "yup": "*"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "@types/react-router-dom": "*"
+  }
+}
