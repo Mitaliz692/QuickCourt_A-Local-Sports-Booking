@@ -28,22 +28,176 @@ export const isValidOTP = (otp: string): boolean => {
   return otpRegex.test(otp);
 };
 
-// File validation for profile pictures
-export const validateProfilePicture = (file: File): { isValid: boolean; error?: string } => {
-  const maxSize = 1024 * 1024; // 1MB
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+// Enhanced file validation for profile pictures
+export const validateProfilePicture = async (file: File): Promise<{ isValid: boolean; error?: string }> => {
+  const maxSize = 5 * 1024 * 1024; // 5MB (increased from 1MB)
+  const minSize = 1024; // 1KB minimum
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+  const maxWidth = 2048;
+  const maxHeight = 2048;
+  const minWidth = 100;
+  const minHeight = 100;
 
+  // Check file type
   if (!allowedTypes.includes(file.type)) {
     return {
       isValid: false,
-      error: 'Please upload a valid image file (JPEG, PNG, or JPG)',
+      error: 'Please upload a valid image file (JPEG, PNG, JPG, or WebP)',
     };
   }
 
+  // Check file size
   if (file.size > maxSize) {
     return {
       isValid: false,
-      error: 'Image size should be less than 1MB',
+      error: 'Image size should be less than 5MB',
+    };
+  }
+
+  if (file.size < minSize) {
+    return {
+      isValid: false,
+      error: 'Image file appears to be corrupted or too small',
+    };
+  }
+
+  // Check if file is actually an image by reading its content
+  try {
+    const isValidImage = await validateImageContent(file);
+    if (!isValidImage) {
+      return {
+        isValid: false,
+        error: 'File does not appear to be a valid image',
+      };
+    }
+  } catch (error) {
+    return {
+      isValid: false,
+      error: 'Unable to process the image file',
+    };
+  }
+
+  // Check image dimensions
+  try {
+    const dimensions = await getImageDimensions(file);
+    if (dimensions.width > maxWidth || dimensions.height > maxHeight) {
+      return {
+        isValid: false,
+        error: `Image dimensions should not exceed ${maxWidth}x${maxHeight} pixels`,
+      };
+    }
+
+    if (dimensions.width < minWidth || dimensions.height < minHeight) {
+      return {
+        isValid: false,
+        error: `Image dimensions should be at least ${minWidth}x${minHeight} pixels`,
+      };
+    }
+  } catch (error) {
+    return {
+      isValid: false,
+      error: 'Unable to read image dimensions',
+    };
+  }
+
+  return { isValid: true };
+};
+
+// Helper function to validate image content by reading file headers
+const validateImageContent = (file: File): Promise<boolean> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const arrayBuffer = e.target?.result as ArrayBuffer;
+      const uint8Array = new Uint8Array(arrayBuffer);
+      
+      // Check file signatures (magic numbers)
+      const signatures = {
+        jpeg: [0xFF, 0xD8, 0xFF],
+        png: [0x89, 0x50, 0x4E, 0x47],
+        webp: [0x52, 0x49, 0x46, 0x46], // RIFF header for WebP
+      };
+
+      let isValid = false;
+      
+      // Check JPEG
+      if (uint8Array[0] === signatures.jpeg[0] && 
+          uint8Array[1] === signatures.jpeg[1] && 
+          uint8Array[2] === signatures.jpeg[2]) {
+        isValid = true;
+      }
+      
+      // Check PNG
+      else if (uint8Array[0] === signatures.png[0] && 
+               uint8Array[1] === signatures.png[1] && 
+               uint8Array[2] === signatures.png[2] && 
+               uint8Array[3] === signatures.png[3]) {
+        isValid = true;
+      }
+      
+      // Check WebP (RIFF header + WEBP)
+      else if (uint8Array[0] === signatures.webp[0] && 
+               uint8Array[1] === signatures.webp[1] && 
+               uint8Array[2] === signatures.webp[2] && 
+               uint8Array[3] === signatures.webp[3] &&
+               uint8Array[8] === 0x57 && uint8Array[9] === 0x45 && 
+               uint8Array[10] === 0x42 && uint8Array[11] === 0x50) {
+        isValid = true;
+      }
+
+      resolve(isValid);
+    };
+    reader.onerror = () => resolve(false);
+    reader.readAsArrayBuffer(file.slice(0, 12)); // Read first 12 bytes for header check
+  });
+};
+
+// Helper function to get image dimensions
+const getImageDimensions = (file: File): Promise<{ width: number; height: number }> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve({ width: img.width, height: img.height });
+    };
+    
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Failed to load image'));
+    };
+    
+    img.src = url;
+  });
+};
+
+// Synchronous version for backward compatibility
+export const validateProfilePictureSync = (file: File): { isValid: boolean; error?: string } => {
+  const maxSize = 5 * 1024 * 1024; // 5MB
+  const minSize = 1024; // 1KB minimum
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+
+  // Check file type
+  if (!allowedTypes.includes(file.type)) {
+    return {
+      isValid: false,
+      error: 'Please upload a valid image file (JPEG, PNG, JPG, or WebP)',
+    };
+  }
+
+  // Check file size
+  if (file.size > maxSize) {
+    return {
+      isValid: false,
+      error: 'Image size should be less than 5MB',
+    };
+  }
+
+  if (file.size < minSize) {
+    return {
+      isValid: false,
+      error: 'Image file appears to be corrupted or too small',
     };
   }
 
@@ -115,8 +269,13 @@ export const ValidationMessages = {
   PASSWORD_MISMATCH: 'Passwords do not match',
   INVALID_OTP: 'OTP must be 6 digits',
   ROLE_REQUIRED: 'Please select your role',
-  PROFILE_PICTURE_TOO_LARGE: 'Image size should be less than 1MB',
-  PROFILE_PICTURE_INVALID_TYPE: 'Please upload a valid image file (JPEG, PNG, or JPG)',
+  PROFILE_PICTURE_TOO_LARGE: 'Image size should be less than 5MB',
+  PROFILE_PICTURE_TOO_SMALL: 'Image file appears to be corrupted or too small',
+  PROFILE_PICTURE_INVALID_TYPE: 'Please upload a valid image file (JPEG, PNG, JPG, or WebP)',
+  PROFILE_PICTURE_INVALID_CONTENT: 'File does not appear to be a valid image',
+  PROFILE_PICTURE_DIMENSIONS_TOO_LARGE: 'Image dimensions should not exceed 2048x2048 pixels',
+  PROFILE_PICTURE_DIMENSIONS_TOO_SMALL: 'Image dimensions should be at least 100x100 pixels',
+  PROFILE_PICTURE_PROCESSING_ERROR: 'Unable to process the image file',
   EMAIL_REQUIRED: 'Email is required',
   PASSWORD_REQUIRED: 'Password is required',
   NAME_REQUIRED: 'Full name is required',

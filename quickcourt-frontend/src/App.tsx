@@ -8,9 +8,14 @@ import HomePage from './pages/HomePage';
 import VenueDetails from './pages/VenueDetails';
 import Login from './components/auth/Login';
 import Signup from './components/auth/Signup';
+import ForgotPassword from './components/auth/ForgotPassword';
 import EmailVerification from './components/auth/EmailVerification';
 import FacilityOwnerDashboard from './pages/FacilityOwnerDashboard';
 import FacilityRegistration from './pages/FacilityRegistration';
+import UserDashboard from './pages/UserDashboard';
+import UserProfile from './pages/UserProfile';
+import BookingMenu from './pages/BookingMenu';
+import VenueBooking from './pages/VenueBooking';
 
 const App: React.FC = () => {
   return (
@@ -24,6 +29,7 @@ const App: React.FC = () => {
             <Route path="/venue/:venueId" element={<VenueDetails />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/verify-email" element={<EmailVerification />} />
             
             {/* Facility Owner Routes */}
@@ -57,7 +63,31 @@ const App: React.FC = () => {
               path="/dashboard" 
               element={
                 <ProtectedRoute>
-                  <div>User Dashboard - Coming Soon</div>
+                  <UserDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/profile" 
+              element={
+                <ProtectedRoute>
+                  <UserProfile />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/book-venue" 
+              element={
+                <ProtectedRoute>
+                  <BookingMenu />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/book-venue/:venueId" 
+              element={
+                <ProtectedRoute>
+                  <VenueBooking />
                 </ProtectedRoute>
               } 
             />

@@ -19,7 +19,6 @@ import { Venue } from '../../types';
 
 interface VenueCardProps {
   venue: Venue;
-  onBookNow?: (venueId: string) => void;
   onViewDetails?: (venueId: string) => void;
   onToggleFavorite?: (venueId: string, isFavorite: boolean) => void;
   isFavorite?: boolean;
@@ -28,17 +27,11 @@ interface VenueCardProps {
 
 const VenueCard: React.FC<VenueCardProps> = ({
   venue,
-  onBookNow,
   onViewDetails,
   onToggleFavorite,
   isFavorite = false,
   showFullDetails = true,
 }) => {
-
-  const handleBookNow = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onBookNow?.(venue._id);
-  };
 
   const handleViewDetails = () => {
     onViewDetails?.(venue._id);
@@ -249,34 +242,18 @@ const VenueCard: React.FC<VenueCardProps> = ({
         {/* Action Buttons */}
         <Box sx={{ display: 'flex', gap: 1, mt: 'auto' }}>
           <Button
-            variant="outlined"
+            variant="contained"
             size="small"
             fullWidth
             onClick={handleViewDetails}
             sx={{
-              borderColor: 'grey.300',
-              color: 'text.primary',
+              bgcolor: 'primary.main',
               '&:hover': {
-                borderColor: 'primary.main',
-                backgroundColor: 'rgba(25, 118, 210, 0.04)',
+                bgcolor: 'primary.dark',
               },
             }}
           >
             View Details
-          </Button>
-          <Button
-            variant="contained"
-            size="small"
-            fullWidth
-            onClick={handleBookNow}
-            sx={{
-              bgcolor: 'secondary.main',
-              '&:hover': {
-                bgcolor: 'secondary.dark',
-              },
-            }}
-          >
-            Book Now
           </Button>
         </Box>
       </CardContent>

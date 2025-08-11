@@ -39,66 +39,12 @@ import {
   Photo,
   Search as SearchIcon,
   Clear as ClearIcon,
-  CalendarToday,
-  AccessTime,
-  Person,
-  CheckCircle,
-  Cancel,
-  Payment,
-  BookOnline,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
-import AnalyticsDashboard from '../components/analytics/AnalyticsDashboard';
 import { useAuth } from '../contexts/AuthContext';
 import { filterVenues, getSearchResultsSummary } from '../utils/venueFilters';
 import { SearchFilters } from '../components/common/AdvancedSearchBar';
 import { Venue } from '../types';
-
-interface VenueBooking {
-  _id: string;
-  venueId: {
-    _id: string;
-    name: string;
-    address: {
-      street: string;
-      city: string;
-    };
-  };
-  userId: {
-    _id: string;
-    fullName: string;
-    email: string;
-    phone?: string;
-  };
-  sport: string;
-  bookingDate: string;
-  startTime: string;
-  endTime: string;
-  duration: number;
-  selectedComponents: {
-    id: string;
-    name: string;
-    type: string;
-    pricePerHour: number;
-  }[];
-  totalAmount: number;
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no_show';
-  paymentDetails: {
-    transactionId: string;
-    paymentMethod: string;
-    paymentStatus: string;
-    paidAmount: number;
-  };
-  createdAt: string;
-}
-
-interface BookingStats {
-  totalBookings: number;
-  todayBookings: number;
-  pendingBookings: number;
-  totalRevenue: number;
-  monthlyRevenue: number;
-}
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -133,7 +79,6 @@ const FacilityOwnerDashboard: React.FC = () => {
   const [filteredVenues, setFilteredVenues] = useState<Venue[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({
     location: '',
@@ -145,52 +90,11 @@ const FacilityOwnerDashboard: React.FC = () => {
     sortOrder: 'desc',
   });
 
-  // Booking management state
-  const [bookings, setBookings] = useState<VenueBooking[]>([]);
-  const [bookingStats, setBookingStats] = useState<BookingStats>({
-    totalBookings: 0,
-    todayBookings: 0,
-    pendingBookings: 0,
-    totalRevenue: 0,
-    monthlyRevenue: 0,
-  });
-  const [loadingBookings, setLoadingBookings] = useState(false);
-  const [bookingFilter, setBookingFilter] = useState<'all' | 'pending' | 'confirmed' | 'completed' | 'cancelled'>('all');
-  const [updatingBookingId, setUpdatingBookingId] = useState<string | null>(null);
-
   const VENUES_PER_PAGE = 8;
 
   useEffect(() => {
     fetchMyVenues();
   }, []);
-
-  // Auto-clear messages after 5 seconds
-  useEffect(() => {
-    if (message) {
-      const timer = setTimeout(() => {
-        setMessage(null);
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [message]);
-
-  // Auto-clear errors after 5 seconds
-  useEffect(() => {
-    if (error) {
-      const timer = setTimeout(() => {
-        setError(null);
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [error]);
-
-  useEffect(() => {
-    // Fetch bookings when bookings tab is selected
-    if (tabValue === 1) {
-      fetchBookings();
-      fetchBookingStats();
-    }
-  }, [tabValue]);
 
   useEffect(() => {
     // Refresh data when returning from venue edit/create
@@ -232,110 +136,6 @@ const FacilityOwnerDashboard: React.FC = () => {
       console.error('Error fetching venues:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchBookings = async () => {
-    try {
-      console.log('Fetching bookings...');
-      setLoadingBookings(true);
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/bookings/venue-bookings', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const data = await response.json();
-      console.log('Bookings response:', data);
-      
-      if (data.success) {
-        setBookings(data.data.bookings || []);
-        console.log('Bookings loaded:', data.data.bookings?.length || 0);
-      } else {
-        setError(data.message);
-        console.error('Failed to fetch bookings:', data.message);
-      }
-    } catch (error) {
-      setError('Failed to fetch bookings. Please try again.');
-      console.error('Error fetching bookings:', error);
-      setBookings([]); // Set empty array on error
-    } finally {
-      setLoadingBookings(false);
-    }
-  };
-
-  const fetchBookingStats = async () => {
-    try {
-      console.log('Fetching booking stats...');
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/bookings/venue-stats', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const data = await response.json();
-      console.log('Booking stats response:', data);
-      
-      if (data.success) {
-        // Ensure all numeric fields are properly set with defaults
-        setBookingStats({
-          totalBookings: data.data.totalBookings || 0,
-          todayBookings: data.data.todayBookings || 0,
-          pendingBookings: data.data.pendingBookings || 0,
-          totalRevenue: data.data.totalRevenue || 0,
-          monthlyRevenue: data.data.monthlyRevenue || 0,
-        });
-        console.log('Booking stats loaded:', data.data);
-      }
-    } catch (error) {
-      console.error('Error fetching booking stats:', error);
-      // Set default values on error
-      setBookingStats({
-        totalBookings: 0,
-        todayBookings: 0,
-        pendingBookings: 0,
-        totalRevenue: 0,
-        monthlyRevenue: 0,
-      });
-    }
-  };
-
-  const updateBookingStatus = async (bookingId: string, newStatus: string) => {
-    setUpdatingBookingId(bookingId);
-    try {
-      console.log('Updating booking status:', { bookingId, newStatus });
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5001/api/bookings/${bookingId}/status`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status: newStatus }),
-      });
-
-      const data = await response.json();
-      console.log('Status update response:', data);
-      
-      if (data.success) {
-        // Refresh bookings after status update
-        await fetchBookings();
-        await fetchBookingStats();
-        setMessage(`Booking status updated to ${newStatus} successfully!`);
-        console.log('Booking status updated successfully');
-      } else {
-        setError(data.message || 'Failed to update booking status');
-        console.error('Status update failed:', data.message);
-      }
-    } catch (error) {
-      setError('Failed to update booking status. Please try again.');
-      console.error('Error updating booking status:', error);
-    } finally {
-      setUpdatingBookingId(null);
     }
   };
 
@@ -558,7 +358,6 @@ const FacilityOwnerDashboard: React.FC = () => {
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
           <Tabs value={tabValue} onChange={handleTabChange} aria-label="venue tabs">
             <Tab label="My Venues" />
-            <Tab label="Bookings" />
             <Tab label="Analytics" />
             <Tab label="Settings" />
           </Tabs>
@@ -573,10 +372,6 @@ const FacilityOwnerDashboard: React.FC = () => {
           ) : error ? (
             <Alert severity="error" sx={{ mb: 2 }}>
               {error}
-            </Alert>
-          ) : message ? (
-            <Alert severity="success" sx={{ mb: 2 }}>
-              {message}
             </Alert>
           ) : (
             <>
@@ -851,202 +646,16 @@ const FacilityOwnerDashboard: React.FC = () => {
           )}
         </TabPanel>
 
-        {/* Bookings Tab */}
         <TabPanel value={tabValue} index={1}>
-          <Box sx={{ mb: 3 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-              <Typography variant="h6">
-                Booking Management
-              </Typography>
-              <Button
-                variant="outlined"
-                onClick={() => {
-                  fetchBookings();
-                  fetchBookingStats();
-                }}
-                disabled={loadingBookings}
-                startIcon={loadingBookings ? <CircularProgress size={20} /> : undefined}
-              >
-                Refresh
-              </Button>
-            </Box>
-            
-            {/* Booking Statistics Cards */}
-            <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap' }}>
-              <Card sx={{ flex: 1, minWidth: 200 }}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <BookOnline color="primary" />
-                    <Box>
-                      <Typography variant="h4">{bookingStats?.totalBookings || 0}</Typography>
-                      <Typography variant="body2" color="text.secondary">Total Bookings</Typography>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </Card>
-              
-              <Card sx={{ flex: 1, minWidth: 200 }}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <CalendarToday color="warning" />
-                    <Box>
-                      <Typography variant="h4">{bookingStats?.todayBookings || 0}</Typography>
-                      <Typography variant="body2" color="text.secondary">Today's Bookings</Typography>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </Card>
-              
-              <Card sx={{ flex: 1, minWidth: 200 }}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <AccessTime color="info" />
-                    <Box>
-                      <Typography variant="h4">{bookingStats?.pendingBookings || 0}</Typography>
-                      <Typography variant="body2" color="text.secondary">Pending Approval</Typography>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </Card>
-              
-              <Card sx={{ flex: 1, minWidth: 200 }}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Payment color="success" />
-                    <Box>
-                      <Typography variant="h4">₹{(bookingStats?.monthlyRevenue || 0).toLocaleString()}</Typography>
-                      <Typography variant="body2" color="text.secondary">Monthly Revenue</Typography>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Box>
-
-            {/* Booking Filter */}
-            <Box sx={{ mb: 3 }}>
-              <FormControl sx={{ minWidth: 200 }}>
-                <InputLabel>Filter by Status</InputLabel>
-                <Select
-                  value={bookingFilter}
-                  label="Filter by Status"
-                  onChange={(e) => setBookingFilter(e.target.value as any)}
-                >
-                  <MenuItem value="all">All Bookings</MenuItem>
-                  <MenuItem value="pending">Pending</MenuItem>
-                  <MenuItem value="confirmed">Confirmed</MenuItem>
-                  <MenuItem value="completed">Completed</MenuItem>
-                  <MenuItem value="cancelled">Cancelled</MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
-
-            {/* Bookings List */}
-            {loadingBookings ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                <CircularProgress />
-              </Box>
-            ) : bookings.length === 0 ? (
-              <Paper sx={{ p: 4, textAlign: 'center' }}>
-                <BookOnline sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-                <Typography variant="h6" gutterBottom>No bookings found</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Your venue bookings will appear here once customers start booking.
-                </Typography>
-              </Paper>
-            ) : (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {bookings
-                  .filter(booking => bookingFilter === 'all' || booking.status === bookingFilter)
-                  .map((booking) => (
-                  <Card key={booking._id} sx={{ p: 2 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                      <Box sx={{ flex: 1 }}>
-                        <Typography variant="h6" gutterBottom>
-                          {booking.venueId?.name || 'Unknown Venue'}
-                        </Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                          <Person fontSize="small" />
-                          <Typography variant="body2">
-                            {booking.userId?.fullName || 'Unknown User'} ({booking.userId?.email || 'No email'})
-                          </Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                          <CalendarToday fontSize="small" />
-                          <Typography variant="body2">
-                            {booking.bookingDate ? new Date(booking.bookingDate).toLocaleDateString() : 'Unknown Date'} | {booking.startTime || '--'} - {booking.endTime || '--'}
-                          </Typography>
-                        </Box>
-                        <Typography variant="body2" color="text.secondary">
-                          Sport: {booking.sport || 'Unknown'} | Duration: {booking.duration || 0}h
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          Facilities: {booking.selectedComponents?.map(comp => comp?.name).filter(Boolean).join(', ') || 'No facilities selected'}
-                        </Typography>
-                      </Box>
-                      
-                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
-                        <Chip
-                          icon={
-                            booking.status === 'confirmed' ? <CheckCircle /> :
-                            booking.status === 'cancelled' ? <Cancel /> :
-                            <AccessTime />
-                          }
-                          label={(booking.status || 'unknown').toUpperCase()}
-                          color={
-                            booking.status === 'confirmed' ? 'success' :
-                            booking.status === 'completed' ? 'primary' :
-                            booking.status === 'cancelled' ? 'error' :
-                            'warning'
-                          }
-                          size="small"
-                        />
-                        
-                        <Typography variant="h6" color="primary">
-                          ₹{booking.totalAmount || 0}
-                        </Typography>
-                        
-                        {booking.status === 'pending' && (
-                          <Box sx={{ display: 'flex', gap: 1 }}>
-                            <Button
-                              size="small"
-                              variant="contained"
-                              color="success"
-                              onClick={() => updateBookingStatus(booking._id, 'confirmed')}
-                              disabled={updatingBookingId === booking._id}
-                            >
-                              {updatingBookingId === booking._id ? 'Updating...' : 'Accept'}
-                            </Button>
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              color="error"
-                              onClick={() => updateBookingStatus(booking._id, 'cancelled')}
-                              disabled={updatingBookingId === booking._id}
-                            >
-                              {updatingBookingId === booking._id ? 'Updating...' : 'Reject'}
-                            </Button>
-                          </Box>
-                        )}
-                      </Box>
-                    </Box>
-                    
-                    <Divider sx={{ my: 1 }} />
-                    
-                    <Typography variant="caption" color="text.secondary">
-                      Booking ID: {booking._id || 'Unknown'} | Created: {booking.createdAt ? new Date(booking.createdAt).toLocaleString() : 'Unknown Date'}
-                    </Typography>
-                  </Card>
-                ))}
-              </Box>
-            )}
-          </Box>
+          <Typography variant="h6" gutterBottom>
+            Analytics Dashboard
+          </Typography>
+          <Alert severity="info">
+            Analytics features coming soon! Track your venue performance, booking statistics, and revenue insights.
+          </Alert>
         </TabPanel>
 
         <TabPanel value={tabValue} index={2}>
-          <AnalyticsDashboard />
-        </TabPanel>
-
-        <TabPanel value={tabValue} index={3}>
           <Typography variant="h6" gutterBottom>
             Account Settings
           </Typography>

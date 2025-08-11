@@ -74,15 +74,6 @@ const VenueDetails: React.FC = () => {
     navigate('/');
   };
 
-  const handleBookNow = () => {
-    if (!isAuthenticated) {
-      navigate('/login');
-      return;
-    }
-    // TODO: Navigate to booking page
-    console.log('Booking venue:', venueId);
-  };
-
   const handleToggleFavorite = () => {
     setIsFavorite(!isFavorite);
     // TODO: Update favorites in backend
@@ -396,21 +387,6 @@ const VenueDetails: React.FC = () => {
                   </Typography>
                 </Box>
               )}
-
-              {/* Book Now Button */}
-              <Button
-                variant="contained"
-                size="large"
-                fullWidth
-                onClick={handleBookNow}
-                sx={{
-                  py: 1.5,
-                  fontSize: '1.1rem',
-                  fontWeight: 600,
-                }}
-              >
-                Book Now
-              </Button>
             </Card>
           </Box>
         </Box>

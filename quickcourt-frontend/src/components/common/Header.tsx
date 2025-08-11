@@ -24,10 +24,10 @@ import {
   Login,
   PersonAdd,
   Dashboard,
-  BookOnline,
   Person,
   Logout,
   Home,
+  BookOnline,
 } from '@mui/icons-material';
 
 interface HeaderProps {
@@ -56,11 +56,6 @@ const Header: React.FC<HeaderProps> = ({
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
   const handleNavigationClick = (path: string) => {
-    // If trying to access venues and not authenticated, redirect to login
-    if (path === '/venues' && !isAuthenticated) {
-      onLogin?.();
-      return;
-    }
     navigate(path);
   };
 
@@ -78,13 +73,11 @@ const Header: React.FC<HeaderProps> = ({
 
   const navigationItems = [
     { label: 'Home', icon: <Home />, path: '/' },
-    { label: 'Book Venues', icon: <BookOnline />, path: '/venues' },
   ];
 
   const userMenuItems = [
-    { label: 'Dashboard', icon: <Dashboard />, action: () => console.log('Dashboard') },
-    { label: 'My Bookings', icon: <BookOnline />, action: () => console.log('My Bookings') },
-    { label: 'Profile', icon: <Person />, action: () => console.log('Profile') },
+    { label: 'Dashboard', icon: <Dashboard />, action: () => navigate('/dashboard') },
+    { label: 'Profile', icon: <Person />, action: () => navigate('/profile') },
     { label: 'Logout', icon: <Logout />, action: onLogout },
   ];
 
@@ -226,7 +219,25 @@ const Header: React.FC<HeaderProps> = ({
               )}
             </Box>
           ) : (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              {/* Book Venue Button */}
+              <Button
+                variant="contained"
+                startIcon={<BookOnline />}
+                onClick={() => navigate('/book-venue')}
+                sx={{
+                  bgcolor: 'success.main',
+                  color: 'white',
+                  '&:hover': {
+                    bgcolor: 'success.dark',
+                  },
+                  fontWeight: 'bold',
+                  px: 3,
+                }}
+              >
+                Book Venue
+              </Button>
+              
               <IconButton
                 onClick={handleProfileMenuOpen}
                 sx={{ p: 0 }}

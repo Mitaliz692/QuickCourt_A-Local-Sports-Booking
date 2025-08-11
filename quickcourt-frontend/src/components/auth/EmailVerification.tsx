@@ -112,8 +112,10 @@ const EmailVerification: React.FC = () => {
         setTimeout(() => {
           if (response.data?.user.role === 'facility_owner') {
             navigate('/facility-dashboard');
+          } else if (response.data?.user.role === 'admin') {
+            navigate('/admin/dashboard');
           } else {
-            navigate('/');
+            navigate('/dashboard');
           }
         }, 2000);
       } else {

@@ -6,6 +6,7 @@ const User = require('../models/User');
 const auth = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const otpService = require('../services/otpService');
+const emailService = require('../services/emailService');
 
 const router = express.Router();
 
@@ -534,6 +535,215 @@ router.post('/logout', auth, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Logout failed',
+    });
+  }
+});
+
+// Forgot Password - Send reset OTP
+router.post('/forgot-password', [
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Please enter a valid email address'),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid input data',
+        errors: errors.array(),
+      });
+    }
+
+    const { email } = req.body;
+
+    // Find user by email
+    const user = await User.findByEmail(email);
+    if (!user) {
+      // Don't reveal if email exists or not for security
+      return res.status(200).json({
+        success: true,
+        message: 'If an account with this email exists, a password reset code has been sent.',
+      });
+    }
+
+    // Generate password reset token
+    const resetOTP = user.generatePasswordResetToken();
+    await user.save({ validateBeforeSave: false });
+
+    try {
+      // Send password reset email
+      await emailService.sendPasswordResetEmail(user.email, user.fullName, resetOTP);
+      
+      res.status(200).json({
+        success: true,
+        message: 'Password reset code has been sent to your email.',
+      });
+    } catch (emailError) {
+      // Reset the token if email fails
+      user.passwordResetToken = undefined;
+      user.passwordResetExpires = undefined;
+      await user.save({ validateBeforeSave: false });
+
+      console.error('Password reset email failed:', emailError);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to send password reset email. Please try again later.',
+      });
+    }
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error. Please try again later.',
+    });
+  }
+});
+
+// Verify Reset OTP
+router.post('/verify-reset-otp', [
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Please enter a valid email address'),
+  body('otp')
+    .isLength({ min: 6, max: 6 })
+    .isNumeric()
+    .withMessage('OTP must be 6 digits'),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid input data',
+        errors: errors.array(),
+      });
+    }
+
+    const { email, otp } = req.body;
+
+    // Find user with password reset token
+    const user = await User.findOne({
+      email: email.toLowerCase(),
+      passwordResetToken: otp,
+      passwordResetExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired reset code.',
+      });
+    }
+
+    // Generate a temporary token for password reset
+    const resetToken = jwt.sign(
+      { userId: user._id, purpose: 'password-reset' },
+      process.env.JWT_SECRET,
+      { expiresIn: '15m' } // 15 minutes to reset password
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Reset code verified successfully.',
+      resetToken,
+    });
+  } catch (error) {
+    console.error('Verify reset OTP error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error. Please try again later.',
+    });
+  }
+});
+
+// Reset Password
+router.post('/reset-password', [
+  body('resetToken')
+    .notEmpty()
+    .withMessage('Reset token is required'),
+  body('newPassword')
+    .isLength({ min: 8, max: 20 })
+    .withMessage('Password must be between 8 and 20 characters')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,20}$/)
+    .withMessage('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character (@$!%*?&)'),
+  body('confirmPassword')
+    .custom((value, { req }) => {
+      if (value !== req.body.newPassword) {
+        throw new Error('Passwords do not match');
+      }
+      return true;
+    }),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid input data',
+        errors: errors.array(),
+      });
+    }
+
+    const { resetToken, newPassword } = req.body;
+
+    // Verify reset token
+    let decoded;
+    try {
+      decoded = jwt.verify(resetToken, process.env.JWT_SECRET);
+    } catch (jwtError) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired reset token.',
+      });
+    }
+
+    // Ensure token is for password reset
+    if (decoded.purpose !== 'password-reset') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid reset token.',
+      });
+    }
+
+    // Find user and ensure reset token is still valid
+    const user = await User.findOne({
+      _id: decoded.userId,
+      passwordResetExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reset session has expired. Please request a new password reset.',
+      });
+    }
+
+    // Update password
+    user.password = newPassword;
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+    await user.save();
+
+    // Send confirmation email
+    try {
+      await emailService.sendPasswordResetConfirmationEmail(user.email, user.fullName);
+    } catch (emailError) {
+      console.error('Password reset confirmation email failed:', emailError);
+      // Don't fail the request if email fails
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Password has been reset successfully. You can now log in with your new password.',
+    });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error. Please try again later.',
     });
   }
 });

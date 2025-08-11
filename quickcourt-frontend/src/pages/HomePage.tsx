@@ -8,25 +8,41 @@ import {
   Paper,
   CircularProgress,
   Alert,
+  Chip,
+  Pagination,
 } from '@mui/material';
 import {
   ArrowForward as ArrowForwardIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import Header from '../components/common/Header';
-import SearchBar from '../components/common/SearchBar';
+import AdvancedSearchBar, { SearchFilters } from '../components/common/AdvancedSearchBar';
 import VenueCard from '../components/common/VenueCard';
 import PopularSports from '../components/common/PopularSports';
 import { Venue } from '../types';
+import { filterVenues, getSearchResultsSummary, getFilteredVenueStats } from '../utils/venueFilters';
 
 const HomePage: React.FC = () => {
   const { isAuthenticated, user, logout } = useAuth();
   const navigate = useNavigate();
   const [venues, setVenues] = useState<Venue[]>([]);
   const [allVenues, setAllVenues] = useState<Venue[]>([]);
+  const [filteredVenues, setFilteredVenues] = useState<Venue[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [favoriteVenues, setFavoriteVenues] = useState<Set<string>>(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>({
+    location: '',
+    sports: [],
+    priceRange: [0, 5000],
+    rating: 0,
+    amenities: [],
+    sortBy: 'rating',
+    sortOrder: 'desc',
+  });
+
+  const VENUES_PER_PAGE = 12;
 
   useEffect(() => {
     // Load real venues from backend (only facility owner registered venues)
@@ -46,8 +62,9 @@ const HomePage: React.FC = () => {
           const approvedVenues = data.data.venues.filter((venue: Venue) => 
             venue.status === 'approved' && venue.isActive
           );
-          setVenues(approvedVenues);
           setAllVenues(approvedVenues);
+          setVenues(approvedVenues);
+          setFilteredVenues(approvedVenues);
           setError(null);
         } else {
           setError('Failed to load venues. Please try again.');
@@ -63,62 +80,15 @@ const HomePage: React.FC = () => {
     loadVenues();
   }, []);
 
-  const handleSearch = async (location: string) => {
-    console.log('Searching for venues:', location);
-    
-    try {
-      setLoading(true);
-      
-      if (!location.trim()) {
-        // If empty search, show all venues
-        setVenues(allVenues);
-        setError(null);
-        setLoading(false);
-        return;
-      }
+  // Apply filters whenever search filters change
+  useEffect(() => {
+    const filtered = filterVenues(allVenues, searchFilters);
+    setFilteredVenues(filtered);
+    setCurrentPage(1); // Reset to first page when filters change
+  }, [allVenues, searchFilters]);
 
-      // Filter venues locally based on location search
-      const results = allVenues.filter(venue => {
-        const searchTerm = location.toLowerCase();
-        return (
-          venue.name.toLowerCase().includes(searchTerm) ||
-          venue.address.city.toLowerCase().includes(searchTerm) ||
-          venue.address.state.toLowerCase().includes(searchTerm) ||
-          venue.address.street.toLowerCase().includes(searchTerm) ||
-          venue.sportsSupported.some(sport => sport.toLowerCase().includes(searchTerm)) ||
-          venue.description.toLowerCase().includes(searchTerm)
-        );
-      });
-
-      setVenues(results);
-      setError(null);
-      
-      // Show message if no venues found
-      if (results.length === 0 && location.trim()) {
-        setError(`No venues found for "${location}". Try searching for different areas or sports.`);
-      }
-    } catch (err) {
-      setError('Failed to search venues. Please try again.');
-      console.error('Search error:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleBookNow = (venueId: string) => {
-    console.log('Booking venue:', venueId);
-    
-    // Check if user is authenticated
-    if (!isAuthenticated) {
-      // Redirect to login page if not authenticated
-      navigate('/login');
-      return;
-    }
-    
-    // If authenticated, navigate to booking page (to be implemented)
-    console.log('User is authenticated, proceeding with booking...');
-    // TODO: Navigate to booking page when implemented
-    // navigate(`/booking/${venueId}`);
+  const handleSearch = (filters: SearchFilters) => {
+    setSearchFilters(filters);
   };
 
   const handleViewDetails = (venueId: string) => {
@@ -210,10 +180,11 @@ const HomePage: React.FC = () => {
             Book premium sports facilities across Ahmedabad's best locations - 
             from S.G. Highway to Sabarmati Riverfront
           </Typography>
-          <SearchBar 
+          <AdvancedSearchBar 
             onSearch={handleSearch} 
             placeholder="Search for sports venues in Ahmedabad..."
-            defaultValue=""
+            showAdvancedFilters={true}
+            initialFilters={searchFilters}
           />
         </Container>
       </Box>
@@ -328,6 +299,20 @@ const HomePage: React.FC = () => {
           </Button>
         </Box>
 
+        {/* Search Results Summary */}
+        {!loading && (
+          <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="body1" color="text.secondary">
+              {getSearchResultsSummary(allVenues.length, filteredVenues.length, searchFilters)}
+            </Typography>
+            {filteredVenues.length > 0 && (
+              <Typography variant="body2" color="text.secondary">
+                Page {currentPage} of {Math.ceil(filteredVenues.length / VENUES_PER_PAGE)}
+              </Typography>
+            )}
+          </Box>
+        )}
+
         {/* Loading State */}
         {loading && (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
@@ -346,37 +331,81 @@ const HomePage: React.FC = () => {
         )}
 
         {/* Venues Grid */}
-        {!loading && venues.length > 0 && (
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-            {venues.map((venue) => (
-              <Box
-                key={venue._id}
-                sx={{
-                  flex: {
-                    xs: '1 1 100%',
-                    sm: '1 1 calc(50% - 12px)',
-                    md: '1 1 calc(33.333% - 16px)',
-                  },
-                  minWidth: 0,
-                }}
-              >
-                <VenueCard
-                  venue={venue}
-                  isFavorite={favoriteVenues.has(venue._id)}
-                  onBookNow={handleBookNow}
-                  onViewDetails={handleViewDetails}
-                  onToggleFavorite={handleToggleFavorite}
+        {!loading && filteredVenues.length > 0 && (
+          <>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+              {filteredVenues
+                .slice((currentPage - 1) * VENUES_PER_PAGE, currentPage * VENUES_PER_PAGE)
+                .map((venue) => (
+                  <Box
+                    key={venue._id}
+                    sx={{
+                      flex: {
+                        xs: '1 1 100%',
+                        sm: '1 1 calc(50% - 12px)',
+                        md: '1 1 calc(33.333% - 16px)',
+                      },
+                      minWidth: 0,
+                    }}
+                  >
+                    <VenueCard
+                      venue={venue}
+                      isFavorite={favoriteVenues.has(venue._id)}
+                      onViewDetails={handleViewDetails}
+                      onToggleFavorite={handleToggleFavorite}
+                    />
+                  </Box>
+                ))}
+            </Box>
+
+            {/* Pagination */}
+            {Math.ceil(filteredVenues.length / VENUES_PER_PAGE) > 1 && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+                <Pagination
+                  count={Math.ceil(filteredVenues.length / VENUES_PER_PAGE)}
+                  page={currentPage}
+                  onChange={(_, page) => setCurrentPage(page)}
+                  color="primary"
+                  size="large"
                 />
               </Box>
-            ))}
-          </Box>
+            )}
+          </>
+        )}
+
+        {/* No Venues Found */}
+        {!loading && filteredVenues.length === 0 && allVenues.length > 0 && (
+          <Paper sx={{ p: 4, textAlign: 'center', mt: 4 }}>
+            <Typography variant="h6" gutterBottom>
+              No venues match your search criteria
+            </Typography>
+            <Typography variant="body2" color="text.secondary" paragraph>
+              Try adjusting your filters or search terms to find more venues.
+            </Typography>
+            <Button 
+              variant="outlined" 
+              onClick={() => {
+                setSearchFilters({
+                  location: '',
+                  sports: [],
+                  priceRange: [0, 5000],
+                  rating: 0,
+                  amenities: [],
+                  sortBy: 'rating',
+                  sortOrder: 'desc',
+                });
+              }}
+            >
+              Clear All Filters
+            </Button>
+          </Paper>
         )}
 
         {/* No venues found */}
-        {!loading && venues.length === 0 && !error && (
+        {!loading && filteredVenues.length === 0 && allVenues.length === 0 && !error && (
           <Box sx={{ textAlign: 'center', py: 8 }}>
             <Typography variant="h6" color="text.secondary">
-              No venues found. Try adjusting your search criteria.
+              No venues available. Check back later for new venues in your area.
             </Typography>
           </Box>
         )}

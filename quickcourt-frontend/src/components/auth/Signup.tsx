@@ -17,6 +17,10 @@ import {
   Radio,
   Avatar,
   LinearProgress,
+  Dialog,
+  DialogContent,
+  DialogActions,
+  Tooltip,
 } from '@mui/material';
 import {
   Visibility,
@@ -37,6 +41,7 @@ import {
   isValidName, 
   isValidPhoneNumber,
   validateProfilePicture,
+  validateProfilePictureSync,
   getPasswordStrength,
   ValidationMessages 
 } from '../../utils/validation';
@@ -63,6 +68,9 @@ interface FormErrors {
 }
 
 const Signup: React.FC = () => {
+  const [isValidatingImage, setIsValidatingImage] = useState(false);
+  const [showImagePreview, setShowImagePreview] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -111,13 +119,38 @@ const Signup: React.FC = () => {
     }
   };
 
-  const handleProfilePictureChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleProfilePictureChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      const validation = validateProfilePicture(file);
+      await processImageFile(file);
+    }
+  };
+
+  const handleRemoveProfilePicture = () => {
+    setFormData((prev) => ({ ...prev, profilePicture: undefined }));
+    setProfilePreview('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const processImageFile = async (file: File) => {
+    setIsValidatingImage(true);
+    setErrors((prev) => ({ ...prev, profilePicture: undefined }));
+    
+    try {
+      // First do synchronous validation for quick feedback
+      const syncValidation = validateProfilePictureSync(file);
+      if (!syncValidation.isValid) {
+        setErrors((prev) => ({ ...prev, profilePicture: syncValidation.error }));
+        setProfilePreview('');
+        return;
+      }
+
+      // Then do comprehensive async validation
+      const validation = await validateProfilePicture(file);
       if (validation.isValid) {
         setFormData((prev) => ({ ...prev, profilePicture: file }));
-        setErrors((prev) => ({ ...prev, profilePicture: undefined }));
         
         // Create preview
         const reader = new FileReader();
@@ -129,14 +162,31 @@ const Signup: React.FC = () => {
         setErrors((prev) => ({ ...prev, profilePicture: validation.error }));
         setProfilePreview('');
       }
+    } catch (error) {
+      setErrors((prev) => ({ ...prev, profilePicture: 'Failed to validate image. Please try again.' }));
+      setProfilePreview('');
+    } finally {
+      setIsValidatingImage(false);
     }
   };
 
-  const handleRemoveProfilePicture = () => {
-    setFormData((prev) => ({ ...prev, profilePicture: undefined }));
-    setProfilePreview('');
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      processImageFile(files[0]);
     }
   };
 
@@ -294,21 +344,72 @@ const Signup: React.FC = () => {
         <Box component="form" onSubmit={handleSubmit} noValidate>
           {/* Profile Picture Upload */}
           <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
-            <Box sx={{ position: 'relative' }}>
-              <Avatar
-                sx={{
-                  width: 80,
-                  height: 80,
-                  border: '3px solid',
-                  borderColor: 'primary.main',
-                  cursor: 'pointer',
-                }}
-                src={profilePreview}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                {!profilePreview && <PhotoCamera />}
-              </Avatar>
-              {profilePreview && (
+            <Box 
+              sx={{ 
+                position: 'relative', 
+                textAlign: 'center',
+                p: 2,
+                border: '2px dashed',
+                borderColor: isDragOver ? 'primary.main' : 'transparent',
+                borderRadius: 2,
+                transition: 'all 0.3s ease',
+                backgroundColor: isDragOver ? 'primary.50' : 'transparent',
+              }}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+            >
+              <Tooltip title={profilePreview ? "Click to view full image" : "Click to upload or drag & drop image"}>
+                <Avatar
+                  sx={{
+                    width: 80,
+                    height: 80,
+                    border: '3px solid',
+                    borderColor: errors.profilePicture ? 'error.main' : 'primary.main',
+                    cursor: 'pointer',
+                    opacity: isValidatingImage ? 0.7 : 1,
+                    transition: 'all 0.3s ease',
+                    margin: '0 auto',
+                    '&:hover': {
+                      transform: 'scale(1.05)',
+                    },
+                  }}
+                  src={profilePreview}
+                  onClick={() => {
+                    if (!isValidatingImage) {
+                      if (profilePreview) {
+                        setShowImagePreview(true);
+                      } else {
+                        fileInputRef.current?.click();
+                      }
+                    }
+                  }}
+                >
+                  {!profilePreview && <PhotoCamera />}
+                </Avatar>
+              </Tooltip>
+              
+              {/* Validation Loading Overlay */}
+              {isValidatingImage && (
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                    borderRadius: '50%',
+                  }}
+                >
+                  <CircularProgress size={24} />
+                </Box>
+              )}
+              
+              {profilePreview && !isValidatingImage && (
                 <IconButton
                   size="small"
                   onClick={handleRemoveProfilePicture}
@@ -326,13 +427,42 @@ const Signup: React.FC = () => {
                   <Cancel fontSize="small" />
                 </IconButton>
               )}
+              
+              {/* Success indicator */}
+              {profilePreview && !isValidatingImage && !errors.profilePicture && (
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    bottom: -8,
+                    right: 8,
+                    backgroundColor: 'success.main',
+                    borderRadius: '50%',
+                    p: 0.5,
+                  }}
+                >
+                  <CheckCircle fontSize="small" sx={{ color: 'white' }} />
+                </Box>
+              )}
+              
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/jpg,image/webp"
                 onChange={handleProfilePictureChange}
                 style={{ display: 'none' }}
+                disabled={isValidatingImage}
               />
+              
+              {/* Helper text */}
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                {isValidatingImage ? 'Validating image...' : (isDragOver ? 'Drop image here' : 'Click to upload or drag & drop')}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                Max 5MB • Min 100x100px • Max 2048x2048px
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                Supported: JPEG, PNG, JPG, WebP
+              </Typography>
             </Box>
           </Box>
           
@@ -577,8 +707,62 @@ const Signup: React.FC = () => {
                 Sign in here
               </Link>
             </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              Forgot your password?{' '}
+              <Link
+                component="button"
+                type="button"
+                onClick={() => navigate('/forgot-password')}
+                sx={{
+                  color: 'primary.main',
+                  textDecoration: 'none',
+                  fontWeight: 'medium',
+                  '&:hover': {
+                    textDecoration: 'underline',
+                  },
+                }}
+              >
+                Reset it here
+              </Link>
+            </Typography>
           </Box>
         </Box>
+        
+        {/* Image Preview Modal */}
+        <Dialog
+          open={showImagePreview}
+          onClose={() => setShowImagePreview(false)}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogContent sx={{ p: 0 }}>
+            {profilePreview && (
+              <Box
+                component="img"
+                src={profilePreview}
+                alt="Profile Preview"
+                sx={{
+                  width: '100%',
+                  height: 'auto',
+                  maxHeight: '70vh',
+                  objectFit: 'contain',
+                }}
+              />
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setShowImagePreview(false)}>Close</Button>
+            <Button
+              onClick={() => {
+                setShowImagePreview(false);
+                fileInputRef.current?.click();
+              }}
+              variant="outlined"
+            >
+              Change Image
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Paper>
     </Box>
   );

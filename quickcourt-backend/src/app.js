@@ -12,6 +12,8 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/user');
 const venueRoutes = require('./routes/venue');
+const paymentRoutes = require('./routes/payment');
+const bookingRoutes = require('./routes/booking');
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
@@ -61,6 +63,8 @@ app.get('/uploads/*', (req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/venues', venueRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/bookings', bookingRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {
