@@ -14,50 +14,59 @@ const userRoutes = require('./routes/user');
 const venueRoutes = require('./routes/venue');
 const paymentRoutes = require('./routes/payment');
 const bookingRoutes = require('./routes/booking');
+const reviewRoutes = require('./routes/review');
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
 
-// Security middleware
-app.use(helmet());
+// Security middleware - disabled for development to avoid CORS issues
+// app.use(helmet());
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.',
+// Disable rate limiting for development
+// app.use(limiter);
+
+// Simple CORS configuration that actually works
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  
+  // Allow localhost origins
+  if (!origin || origin.includes('localhost') || origin.includes('127.0.0.1')) {
+    res.header('Access-Control-Allow-Origin', origin || 'http://localhost:3000');
+  } else {
+    res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+  }
+  
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin,X-Requested-With,Content-Type,Accept,Authorization,Cache-Control,Pragma');
+  res.header('Access-Control-Expose-Headers', 'Content-Length,Content-Type,Authorization');
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+  
+  next();
 });
-app.use(limiter);
-
-// CORS configuration
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  exposedHeaders: ['Content-Length', 'Content-Type']
-}));
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Static files with proper CORS headers
-app.use('/uploads', cors(), express.static('uploads', {
-  setHeaders: (res, path) => {
-    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-    res.setHeader('Access-Control-Allow-Origin', '*');
+// Explicit OPTIONS handler for all routes
+// Static files serving with CORS
+app.use('/uploads', (req, res, next) => {
+  const origin = req.headers.origin;
+  if (!origin || origin.includes('localhost') || origin.includes('127.0.0.1')) {
+    res.header('Access-Control-Allow-Origin', origin || 'http://localhost:3000');
+  } else {
+    res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
   }
-}));
-
-// Alternative image serving route with explicit CORS headers
-app.get('/uploads/*', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Cross-Origin-Resource-Policy', 'cross-origin');
   next();
-});
+}, express.static('uploads'));
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -65,6 +74,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/venues', venueRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/bookings', bookingRoutes);
+app.use('/api/reviews', reviewRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {

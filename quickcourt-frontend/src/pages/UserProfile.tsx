@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -106,7 +106,7 @@ interface Booking {
 }
 
 const UserProfile: React.FC = () => {
-  const { user, isAuthenticated, logout, updateUser } = useAuth();
+  const { user, isAuthenticated, logout, updateUser, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
@@ -129,6 +129,13 @@ const UserProfile: React.FC = () => {
     }
   }, [isAuthenticated, navigate]);
 
+  // Refresh user data when component mounts to get latest verification status
+  useEffect(() => {
+    if (isAuthenticated) {
+      refreshUser();
+    }
+  }, [isAuthenticated, refreshUser]);
+
   const [formData, setFormData] = useState<FormData>({
     fullName: user?.fullName || '',
     email: user?.email || '',
@@ -138,15 +145,7 @@ const UserProfile: React.FC = () => {
     confirmPassword: '',
   });
 
-  // Fetch booking data on component mount
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      fetchBookings();
-      fetchBookingStats();
-    }
-  }, [isAuthenticated, user]);
-
-  const fetchBookings = async () => {
+  const fetchBookings = useCallback(async () => {
     try {
       setLoadingBookings(true);
       const response = await fetch('http://localhost:5000/api/bookings/my-bookings', {
@@ -167,9 +166,9 @@ const UserProfile: React.FC = () => {
     } finally {
       setLoadingBookings(false);
     }
-  };
+  }, []);
 
-  const fetchBookingStats = async () => {
+  const fetchBookingStats = useCallback(async () => {
     try {
       const response = await fetch('http://localhost:5000/api/bookings/stats', {
         headers: {
@@ -184,7 +183,15 @@ const UserProfile: React.FC = () => {
     } catch (error) {
       console.error('Error fetching booking stats:', error);
     }
-  };
+  }, []);
+
+  // Fetch booking data on component mount
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      fetchBookings();
+      fetchBookingStats();
+    }
+  }, [isAuthenticated, user, fetchBookings, fetchBookingStats]);
 
   // Update form data when user data changes
   React.useEffect(() => {

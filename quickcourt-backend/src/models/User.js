@@ -133,7 +133,8 @@ userSchema.virtual('profile').get(function () {
     phone: this.phone,
     role: this.role,
     profilePicture: this.profilePicture,
-    isEmailVerified: this.isEmailVerified,
+    isVerified: this.isEmailVerified,  // Map isEmailVerified to isVerified for frontend
+    isActive: this.isActive,
     lastLogin: this.lastLogin,
     createdAt: this.createdAt,
   };

@@ -69,7 +69,13 @@ const BookingMenu: React.FC = () => {
     const fetchVenues = async () => {
       try {
         setLoading(true);
-        const response = await fetch('http://localhost:5000/api/venues');
+        const response = await fetch('http://localhost:5000/api/venues', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include'
+        });
         
         if (!response.ok) {
           throw new Error('Failed to fetch venues');

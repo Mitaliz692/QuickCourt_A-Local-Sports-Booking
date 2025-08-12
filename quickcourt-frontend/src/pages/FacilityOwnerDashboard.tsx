@@ -764,7 +764,7 @@ const FacilityOwnerDashboard: React.FC = () => {
                             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                               <Star sx={{ fontSize: 16, color: 'warning.main', mr: 0.5 }} />
                               <Typography variant="body2">
-                                {venue.rating.average.toFixed(1)} ({venue.rating.count} reviews)
+                                {venue.rating?.average ? venue.rating.average.toFixed(1) : '0.0'} ({venue.rating?.count || 0} reviews)
                               </Typography>
                             </Box>
 

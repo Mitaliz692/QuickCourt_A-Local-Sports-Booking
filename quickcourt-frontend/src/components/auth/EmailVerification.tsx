@@ -29,7 +29,7 @@ interface FormErrors {
 const EmailVerification: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useAuth();
+  const { login, refreshUser, isAuthenticated } = useAuth();
   const locationState = location.state as LocationState;
   
   const [email, setEmail] = useState(locationState?.email || '');
@@ -103,21 +103,28 @@ const EmailVerification: React.FC = () => {
       const response = await authService.verifyEmail({ email, otp });
       
       if (response.success && response.data) {
-        // Use auth context to login
-        login(response.data.token, response.data.user);
-        
-        // Show success message and redirect based on user role
-        setSuccessMessage('Email verified successfully! Redirecting...');
-        
-        setTimeout(() => {
-          if (response.data?.user.role === 'facility_owner') {
-            navigate('/facility-dashboard');
-          } else if (response.data?.user.role === 'admin') {
-            navigate('/admin/dashboard');
-          } else {
-            navigate('/dashboard');
-          }
-        }, 2000);
+        if (isAuthenticated) {
+          // If user is already logged in, just refresh their data to update verification status
+          await refreshUser();
+          setSuccessMessage('Email verified successfully!');
+          setTimeout(() => {
+            navigate(-1); // Go back to previous page
+          }, 2000);
+        } else {
+          // If user is not logged in, log them in with the new verified user data
+          login(response.data.token, response.data.user);
+          setSuccessMessage('Email verified successfully! Redirecting...');
+          
+          setTimeout(() => {
+            if (response.data?.user.role === 'facility_owner') {
+              navigate('/facility-dashboard');
+            } else if (response.data?.user.role === 'admin') {
+              navigate('/admin/dashboard');
+            } else {
+              navigate('/dashboard');
+            }
+          }, 2000);
+        }
       } else {
         setErrors({ general: response.message || 'Verification failed' });
       }

@@ -15,6 +15,7 @@ import {
   CircularProgress,
   Alert,
   Rating,
+  Pagination,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -29,6 +30,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import Header from '../components/common/Header';
+import ReviewCard from '../components/ReviewCard';
 import { Venue } from '../types';
 
 const VenueDetails: React.FC = () => {
@@ -39,6 +41,10 @@ const VenueDetails: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsPage, setReviewsPage] = useState(1);
+  const [totalReviewPages, setTotalReviewPages] = useState(1);
 
   useEffect(() => {
     const loadVenueDetails = async () => {
@@ -50,12 +56,19 @@ const VenueDetails: React.FC = () => {
 
       try {
         setLoading(true);
-        const response = await fetch(`http://localhost:5000/api/venues/${venueId}`);
+        const response = await fetch(`http://localhost:5000/api/venues/${venueId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include'
+        });
         const data = await response.json();
 
         if (data.success) {
           setVenue(data.data.venue);
           setError(null);
+          console.log('Venue loaded:', data.data.venue.name, 'Rating:', data.data.venue.rating);
         } else {
           setError('Failed to load venue details');
         }
@@ -69,6 +82,69 @@ const VenueDetails: React.FC = () => {
 
     loadVenueDetails();
   }, [venueId]);
+
+  const loadVenueReviews = async (page: number = 1) => {
+    if (!venueId) return;
+    
+    try {
+      setReviewsLoading(true);
+      const response = await fetch(`http://localhost:5000/api/reviews/venue/${venueId}?page=${page}&limit=5`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setReviews(data.data.reviews);
+        setTotalReviewPages(data.data.pagination.pages);
+        
+        // Refresh venue data after a short delay to get updated rating
+        setTimeout(() => {
+          refreshVenueData();
+        }, 1000); // 1 second delay
+      }
+    } catch (err) {
+      console.error('Reviews loading error:', err);
+    } finally {
+      setReviewsLoading(false);
+    }
+  };
+
+  const refreshVenueData = async () => {
+    if (!venueId) return;
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/venues/${venueId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include'
+      });
+      const data = await response.json();
+
+      if (data.success && data.data && data.data.venue) {
+        setVenue(data.data.venue);
+        console.log('Venue data refreshed with rating:', data.data.venue.rating);
+      }
+    } catch (err) {
+      console.error('Failed to refresh venue data:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (venueId) {
+      loadVenueReviews(reviewsPage);
+    }
+  }, [venueId, reviewsPage]);
+
+  // Auto-refresh venue data every 30 seconds to get updated ratings
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (venueId && !loading) {
+        refreshVenueData();
+      }
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, [venueId, loading]);
 
   const handleBack = () => {
     navigate('/');
@@ -387,6 +463,49 @@ const VenueDetails: React.FC = () => {
                   </Typography>
                 </Box>
               )}
+
+              <Divider sx={{ my: 2 }} />
+
+              {/* Reviews Section */}
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                  Reviews & Ratings ({venue.rating?.count || 0})
+                </Typography>
+                
+                {reviewsLoading ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                    <CircularProgress />
+                  </Box>
+                ) : reviews.length > 0 ? (
+                  <>
+                    <Box sx={{ mb: 3 }}>
+                      {reviews.map((review) => (
+                        <ReviewCard 
+                          key={review._id} 
+                          review={review} 
+                          currentUserId={user?._id}
+                          showVenueName={false}
+                        />
+                      ))}
+                    </Box>
+                    
+                    {totalReviewPages > 1 && (
+                      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+                        <Pagination
+                          count={totalReviewPages}
+                          page={reviewsPage}
+                          onChange={(_, page) => setReviewsPage(page)}
+                          color="primary"
+                        />
+                      </Box>
+                    )}
+                  </>
+                ) : (
+                  <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
+                    No reviews yet. Be the first to review this venue!
+                  </Typography>
+                )}
+              </Box>
             </Card>
           </Box>
         </Box>

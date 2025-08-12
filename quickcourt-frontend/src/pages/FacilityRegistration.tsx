@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Container,
@@ -125,6 +125,190 @@ const FacilityRegistration: React.FC = () => {
   const [newFacility, setNewFacility] = useState({ name: '', description: '', available: true });
   const [newRule, setNewRule] = useState('');
 
+  // Validation state
+  const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
+  const [touched, setTouched] = useState<{[key: string]: boolean}>({});
+
+  // Validation functions
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validatePhone = (phone: string): boolean => {
+    const phoneRegex = /^\+?[\d\s\-\(\)]{10,}$/;
+    return phoneRegex.test(phone.replace(/\s+/g, ''));
+  };
+
+  const validateZipCode = (zipCode: string): boolean => {
+    const zipRegex = /^[1-9][0-9]{5}$/;
+    return zipRegex.test(zipCode);
+  };
+
+  const validateURL = (url: string): boolean => {
+    if (!url) return true; // Optional field
+    try {
+      new URL(url.startsWith('http') ? url : `https://${url}`);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const validateField = (fieldName: string, value: any): string => {
+    switch (fieldName) {
+      case 'name':
+        if (!value || value.trim().length < 2) {
+          return 'Facility name is required';
+        }
+        return '';
+
+      case 'description':
+        if (!value || value.trim().length < 5) {
+          return 'Please provide a brief description';
+        }
+        return '';
+
+      case 'address.street':
+        if (!value || value.trim().length < 3) {
+          return 'Street address is required';
+        }
+        return '';
+
+      case 'address.city':
+        if (!value || value.trim().length < 2) {
+          return 'City name is required';
+        }
+        return '';
+
+      case 'address.zipCode':
+        if (!value || value.trim().length < 5) {
+          return 'PIN code is required';
+        }
+        return '';
+
+      case 'contactInfo.phone':
+        if (!value || value.trim().length < 10) {
+          return 'Phone number is required';
+        }
+        return '';
+
+      case 'contactInfo.email':
+        if (!value || !validateEmail(value)) {
+          return 'Valid email address is required';
+        }
+        return '';
+
+      case 'contactInfo.website':
+        // Website is optional, no validation needed
+        return '';
+
+      case 'sportsSupported':
+        if (!value || value.length === 0) {
+          return 'Please select at least one sport';
+        }
+        return '';
+
+      case 'priceRange.min':
+        if (!value || value <= 0) {
+          return 'Minimum price is required';
+        }
+        return '';
+
+      case 'priceRange.max':
+        if (!value || value <= 0) {
+          return 'Maximum price is required';
+        }
+        if (formData.priceRange.min && value < formData.priceRange.min) {
+          return 'Maximum price should be greater than minimum price';
+        }
+        return '';
+
+      default:
+        return '';
+    }
+  };
+
+  const handleFieldBlur = useCallback((fieldName: string) => {
+    // Only validate critical fields on blur, not all fields
+    const criticalFields = ['contactInfo.email', 'priceRange.min', 'priceRange.max'];
+    
+    setTouched(prev => ({ ...prev, [fieldName]: true }));
+    
+    if (criticalFields.includes(fieldName)) {
+      const value = getFieldValue(fieldName);
+      const error = validateField(fieldName, value);
+      setValidationErrors(prev => ({ ...prev, [fieldName]: error }));
+    }
+  }, []);
+
+  const getFieldValue = (fieldName: string): any => {
+    if (fieldName.includes('.')) {
+      const parts = fieldName.split('.');
+      let current = formData as any;
+      for (const part of parts) {
+        current = current?.[part];
+      }
+      return current;
+    }
+    return (formData as any)[fieldName];
+  };
+
+  const validateStep = (step: number): { isValid: boolean; errors: string[] } => {
+    const errors: string[] = [];
+    let fieldsToValidate: string[] = [];
+
+    switch (step) {
+      case 0:
+        fieldsToValidate = ['name', 'description'];
+        break;
+      case 1:
+        fieldsToValidate = [
+          'address.street',
+          'address.city',
+          'address.zipCode',
+          'contactInfo.phone',
+          'contactInfo.email',
+          'contactInfo.website'
+        ];
+        break;
+      case 2:
+        fieldsToValidate = ['sportsSupported'];
+        break;
+      case 3:
+        fieldsToValidate = ['priceRange.min', 'priceRange.max'];
+        break;
+      case 4:
+        // Photos are optional
+        return { isValid: true, errors: [] };
+      default:
+        return { isValid: false, errors: ['Invalid step'] };
+    }
+
+    const stepErrors: {[key: string]: string} = {};
+    
+    for (const fieldName of fieldsToValidate) {
+      const value = getFieldValue(fieldName);
+      const error = validateField(fieldName, value);
+      if (error) {
+        errors.push(error);
+        stepErrors[fieldName] = error;
+      }
+    }
+
+    // Update validation errors for this step
+    setValidationErrors(prev => ({ ...prev, ...stepErrors }));
+    
+    // Mark all fields in this step as touched
+    const touchedFields: {[key: string]: boolean} = {};
+    for (const fieldName of fieldsToValidate) {
+      touchedFields[fieldName] = true;
+    }
+    setTouched(prev => ({ ...prev, ...touchedFields }));
+
+    return { isValid: errors.length === 0, errors };
+  };
+
   const [formData, setFormData] = useState<VenueFormData>({
     name: '',
     description: '',
@@ -209,7 +393,7 @@ const FacilityRegistration: React.FC = () => {
     }
   };
 
-  const handleInputChange = (field: string, value: any) => {
+  const handleInputChange = useCallback((field: string, value: any) => {
     if (field.includes('.')) {
       const parts = field.split('.');
       setFormData(prev => {
@@ -232,7 +416,15 @@ const FacilityRegistration: React.FC = () => {
     } else {
       setFormData(prev => ({ ...prev, [field]: value }));
     }
-  };
+
+    // Clear any existing error for this field when user starts typing
+    setValidationErrors(prev => {
+      if (prev[field]) {
+        return { ...prev, [field]: '' };
+      }
+      return prev;
+    });
+  }, []);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
@@ -284,18 +476,25 @@ const FacilityRegistration: React.FC = () => {
     }));
   };
 
-  const handleNext = () => {
-    setActiveStep(prev => Math.min(prev + 1, steps.length - 1));
-  };
-
-  const handleBack = () => {
-    setActiveStep(prev => Math.max(prev - 1, 0));
-  };
-
   const handleSubmit = async () => {
     try {
       setSubmitLoading(true);
       setError(null);
+
+      // Validate all steps before submission
+      const allErrors: string[] = [];
+      for (let step = 0; step < 4; step++) {
+        const validation = validateStep(step);
+        if (!validation.isValid) {
+          allErrors.push(...validation.errors);
+        }
+      }
+
+      if (allErrors.length > 0) {
+        setError(`Please fix the following errors before submitting: ${allErrors.join(', ')}`);
+        setSubmitLoading(false);
+        return;
+      }
 
       const token = localStorage.getItem('token');
       const submitFormData = new FormData();
@@ -354,6 +553,7 @@ const FacilityRegistration: React.FC = () => {
   };
 
   const isStepValid = (step: number): boolean => {
+    // Simplified validation - only check if required fields have values
     switch (step) {
       case 0:
         return formData.name.trim() !== '' && formData.description.trim() !== '';
@@ -374,6 +574,56 @@ const FacilityRegistration: React.FC = () => {
       default:
         return false;
     }
+  };
+
+  const validateCurrentStep = () => {
+    // This function can update state and should only be called on user actions
+    const validation = validateStep(activeStep);
+    
+    // Only show user-friendly messages, not technical validation errors
+    if (!validation.isValid) {
+      const friendlyMessages: string[] = [];
+      
+      switch (activeStep) {
+        case 0:
+          if (!formData.name.trim()) friendlyMessages.push('Facility name is required');
+          if (!formData.description.trim()) friendlyMessages.push('Description is required');
+          break;
+        case 1:
+          if (!formData.address.street.trim()) friendlyMessages.push('Address is required');
+          if (!formData.address.city.trim()) friendlyMessages.push('City is required');
+          if (!formData.address.zipCode.trim()) friendlyMessages.push('PIN code is required');
+          if (!formData.contactInfo.phone.trim()) friendlyMessages.push('Phone number is required');
+          if (!formData.contactInfo.email.trim()) friendlyMessages.push('Email is required');
+          break;
+        case 2:
+          if (formData.sportsSupported.length === 0) friendlyMessages.push('Please select at least one sport');
+          break;
+        case 3:
+          if (formData.priceRange.min <= 0) friendlyMessages.push('Minimum price is required');
+          if (formData.priceRange.max <= 0) friendlyMessages.push('Maximum price is required');
+          break;
+      }
+      
+      return { isValid: false, errors: friendlyMessages };
+    }
+    
+    return validation;
+  };
+
+  const handleNext = () => {
+    const validation = validateCurrentStep();
+    if (validation.isValid) {
+      setError(null);
+      setActiveStep((prevActiveStep) => prevActiveStep + 1);
+    } else {
+      setError(`Please fix the following errors: ${validation.errors.join(', ')}`);
+    }
+  };
+
+  const handleBack = () => {
+    setError(null);
+    setActiveStep((prevActiveStep) => prevActiveStep - 1);
   };
 
   if (loading) {
@@ -445,8 +695,13 @@ const FacilityRegistration: React.FC = () => {
                 value={formData.name}
                 onChange={(e) => handleInputChange('name', e.target.value)}
                 required
+                error={touched.name && !!validationErrors.name}
+                helperText={
+                  touched.name && validationErrors.name 
+                    ? validationErrors.name 
+                    : "Enter the name of your sports facility"
+                }
                 sx={{ mb: 3 }}
-                helperText="Enter the name of your sports facility"
               />
 
               <TextField
@@ -457,8 +712,13 @@ const FacilityRegistration: React.FC = () => {
                 required
                 multiline
                 rows={4}
+                error={touched.description && !!validationErrors.description}
+                helperText={
+                  touched.description && validationErrors.description 
+                    ? validationErrors.description 
+                    : "Describe your facility, its features, and what makes it special"
+                }
                 sx={{ mb: 3 }}
-                helperText="Describe your facility, its features, and what makes it special"
               />
             </Box>
           )}
@@ -509,7 +769,11 @@ const FacilityRegistration: React.FC = () => {
                   label="PIN Code"
                   value={formData.address.zipCode}
                   onChange={(e) => handleInputChange('address.zipCode', e.target.value)}
+                  onBlur={() => handleFieldBlur('address.zipCode')}
                   required
+                  error={touched['address.zipCode'] && !!validationErrors['address.zipCode']}
+                  helperText={touched['address.zipCode'] && validationErrors['address.zipCode']}
+                  inputProps={{ maxLength: 6 }}
                 />
               </Box>
 
@@ -535,7 +799,14 @@ const FacilityRegistration: React.FC = () => {
                 type="email"
                 value={formData.contactInfo.email}
                 onChange={(e) => handleInputChange('contactInfo.email', e.target.value)}
+                onBlur={() => handleFieldBlur('contactInfo.email')}
                 required
+                error={touched['contactInfo.email'] && !!validationErrors['contactInfo.email']}
+                helperText={
+                  touched['contactInfo.email'] && validationErrors['contactInfo.email']
+                    ? validationErrors['contactInfo.email']
+                    : "Enter your facility's contact email address"
+                }
                 sx={{ mb: 3 }}
                 InputProps={{
                   startAdornment: (
@@ -551,8 +822,8 @@ const FacilityRegistration: React.FC = () => {
                 label="Website (Optional)"
                 value={formData.contactInfo.website}
                 onChange={(e) => handleInputChange('contactInfo.website', e.target.value)}
-                sx={{ mb: 3 }}
                 helperText="Your facility's website URL (if any)"
+                sx={{ mb: 3 }}
               />
             </Box>
           )}
@@ -567,12 +838,19 @@ const FacilityRegistration: React.FC = () => {
                 What sports does your facility support and what amenities do you offer?
               </Typography>
 
-              <FormControl fullWidth sx={{ mb: 3 }}>
+              <FormControl 
+                fullWidth 
+                sx={{ mb: 3 }}
+                error={touched.sportsSupported && !!validationErrors.sportsSupported}
+              >
                 <InputLabel>Sports Supported *</InputLabel>
                 <Select
                   multiple
                   value={formData.sportsSupported}
-                  onChange={(e) => handleInputChange('sportsSupported', e.target.value)}
+                  onChange={(e) => {
+                    handleInputChange('sportsSupported', e.target.value);
+                    handleFieldBlur('sportsSupported');
+                  }}
                   input={<OutlinedInput label="Sports Supported *" />}
                   renderValue={(selected) => (
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
@@ -588,7 +866,12 @@ const FacilityRegistration: React.FC = () => {
                     </MenuItem>
                   ))}
                 </Select>
-                <FormHelperText>Select all sports that your facility supports</FormHelperText>
+                <FormHelperText>
+                  {touched.sportsSupported && validationErrors.sportsSupported 
+                    ? validationErrors.sportsSupported 
+                    : "Select all sports that your facility supports"
+                  }
+                </FormHelperText>
               </FormControl>
 
               <FormControl fullWidth sx={{ mb: 3 }}>
@@ -725,7 +1008,11 @@ const FacilityRegistration: React.FC = () => {
                   type="number"
                   value={formData.priceRange.min}
                   onChange={(e) => handleInputChange('priceRange.min', parseInt(e.target.value) || 0)}
+                  onBlur={() => handleFieldBlur('priceRange.min')}
                   required
+                  error={touched['priceRange.min'] && !!validationErrors['priceRange.min']}
+                  helperText={touched['priceRange.min'] && validationErrors['priceRange.min']}
+                  inputProps={{ min: 1, max: 10000 }}
                 />
                 <TextField
                   fullWidth
@@ -733,7 +1020,11 @@ const FacilityRegistration: React.FC = () => {
                   type="number"
                   value={formData.priceRange.max}
                   onChange={(e) => handleInputChange('priceRange.max', parseInt(e.target.value) || 0)}
+                  onBlur={() => handleFieldBlur('priceRange.max')}
                   required
+                  error={touched['priceRange.max'] && !!validationErrors['priceRange.max']}
+                  helperText={touched['priceRange.max'] && validationErrors['priceRange.max']}
+                  inputProps={{ min: 1, max: 10000 }}
                 />
               </Box>
 

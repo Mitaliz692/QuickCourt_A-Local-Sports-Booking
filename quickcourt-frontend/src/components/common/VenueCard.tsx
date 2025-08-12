@@ -178,14 +178,14 @@ const VenueCard: React.FC<VenueCardProps> = ({
         {/* Rating and Reviews */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
           <Rating
-            value={venue.rating.average}
+            value={venue.rating?.average || 0}
             precision={0.1}
             size="small"
             readOnly
             sx={{ fontSize: '1rem' }}
           />
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            {venue.rating.average.toFixed(1)} ({venue.rating.count})
+            {venue.rating?.average ? venue.rating.average.toFixed(1) : '0.0'} ({venue.rating?.count || 0})
           </Typography>
         </Box>
 
